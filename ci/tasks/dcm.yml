@@ -1,0 +1,25 @@
+platform: linux
+
+image_resource:
+  type: registry-image
+  source:
+    repository: python
+    tag: "3.12-slim"
+
+inputs:
+  - name: repo
+
+params:
+  DCM_ACTION: plan           # plan | deploy
+  DCM_TARGET:                # DEV | QA | PROD (manifest target)
+  AUTH_MODE: oidc            # oidc | keypair
+  SNOWFLAKE_ACCOUNT:
+  SNOWFLAKE_TOKEN:
+  SNOWFLAKE_USER:
+  SNOWFLAKE_PRIVATE_KEY_RAW:
+  TARGET_DB:
+  DEPLOY_ENV:
+
+run:
+  path: bash
+  args: [repo/ci/tasks/dcm.sh]

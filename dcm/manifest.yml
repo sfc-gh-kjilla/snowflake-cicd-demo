@@ -1,0 +1,38 @@
+manifest_version: 2
+type: DCM_PROJECT
+default_target: 'DEV'
+
+# One target per environment. At the customer each target is its own Snowflake
+# account (different account_identifier); in this demo all three point at the
+# same account, so each target has its own database and project object.
+targets:
+  DEV:
+    account_identifier: SFSENORTHAMERICA-KJILLA
+    project_name: 'CICD_DEMO_DEV.DCM.DEMO_PROJECT'
+    project_owner: CICD_DEPLOY_DEV
+    templating_config: 'DEV'
+  QA:
+    account_identifier: SFSENORTHAMERICA-KJILLA
+    project_name: 'CICD_DEMO_QA.DCM.DEMO_PROJECT'
+    project_owner: CICD_DEPLOY_QA
+    templating_config: 'QA'
+  PROD:
+    account_identifier: SFSENORTHAMERICA-KJILLA
+    project_name: 'CICD_DEMO_PROD.DCM.DEMO_PROJECT'
+    project_owner: CICD_DEPLOY_PROD
+    templating_config: 'PROD'
+
+templating:
+  defaults:
+    db: 'CICD_DEMO_DEV'
+    retention_days: 1
+  configurations:
+    DEV:
+      db: 'CICD_DEMO_DEV'
+      retention_days: 1
+    QA:
+      db: 'CICD_DEMO_QA'
+      retention_days: 1
+    PROD:
+      db: 'CICD_DEMO_PROD'
+      retention_days: 7

@@ -31,6 +31,32 @@ scripts/deploy.sh               CI-agnostic: migrations -> smoke tests -> record
 alternatives/github-actions/    same pipeline as GitHub workflows
 ```
 
+## Option 2: DCM path (declarative)
+
+The same app is also defined as a DCM project in `dcm/`. Its jobs are on the **dcm**
+tab of the pipeline and manage a separate schema, `APP_DCM`, so they never overlap
+with the scripted path (`APP`).
+
+```
+dcm/manifest.yml                    targets DEV / QA / PROD (one account each at the customer)
+dcm/sources/definitions/tables.sql  DEFINE SCHEMA APP_DCM, ORDERS, DEPLOYMENT_LOG
+dcm/sources/definitions/serve.sql   DEFINE VIEW CUSTOMER_SUMMARY
+dcm/post_deploy.sql                 seed rows (DCM definitions can't contain INSERT)
+ci/tasks/dcm.sh                     create-if-missing -> plan -> [deploy -> seed -> smoke tests -> record]
+setup/05_dcm_prereqs.sql            DCM schema + CREATE DCM PROJECT grant per environment
+```
+
+Flow: `dcm-dev` (auto: plan + deploy) → `dcm-plan-qa` (manual, read the plan) →
+`dcm-deploy-qa` (manual) → `dcm-plan-prod` → `dcm-deploy-prod`. Each deploy uses the
+commit SHA as its DCM deployment alias, so `snow dcm list-deployments` ties every
+deployment back to Git.
+
+Demo talking points:
+- Add a column to `ORDERS` in `tables.sql`, commit: the QA plan shows `ALTER TABLE ... ADD COLUMN`.
+- Delete the `CUSTOMER_SUMMARY` definition: the plan shows a **DROP** and the job prints a warning. DCM deletes undefined objects, so the plan gate matters.
+- DCM needs Snowflake CLI 3.24+ (the task installs the latest).
+- With OIDC, each Concourse job has its own subject (`.../dcm-dev`, `.../dcm-deploy-qa`, ...). Add one workload identity per job to the service user with `ALTER USER ... ADD WORKLOAD IDENTITY` (up to 10 per user).
+
 ## Why the demo needs a tunnel for OIDC
 
 Snowflake validates the Concourse-signed JWT by fetching
