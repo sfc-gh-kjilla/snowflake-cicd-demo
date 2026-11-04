@@ -1,0 +1,49 @@
+name: PR validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate in isolated PR schema
+    runs-on: ubuntu-latest
+    # Uses the DEV identity; the dev environment has no approval gate.
+    environment: dev
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+      TARGET_DB: ${{ vars.TARGET_DB }}
+      TARGET_SCHEMA: PR_${{ github.event.pull_request.number }}
+      DEPLOY_ENV: pr-${{ github.event.pull_request.number }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Snowflake CLI (OIDC)
+        uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+
+      - name: Verify connection
+        run: snow connection test -x
+
+      - name: Create isolated PR schema
+        run: snow sql -x -q "CREATE OR REPLACE SCHEMA ${TARGET_DB}.${TARGET_SCHEMA}"
+
+      - name: Migrate and test
+        run: bash scripts/deploy.sh
+
+      - name: Drop PR schema
+        if: always()
+        run: snow sql -x -q "DROP SCHEMA IF EXISTS ${TARGET_DB}.${TARGET_SCHEMA}"

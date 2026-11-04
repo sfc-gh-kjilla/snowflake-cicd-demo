@@ -1,0 +1,15 @@
+# Copy to ci/vars.yml (git-ignored) and fill in. Never commit real keys.
+git_uri: https://github.com/<owner>/snowflake-cicd-demo.git
+snowflake_account: SFSENORTHAMERICA-KJILLA
+
+# oidc (primary) or keypair (fallback when the issuer isn't publicly reachable)
+auth_mode: oidc
+
+# Must also be in each OIDC service user's OIDC_AUDIENCE_LIST.
+snowflake_oidc_audience: sfsenorthamerica-kjilla.snowflakecomputing.com
+
+# Key-pair fallback only; leave "" when auth_mode is oidc.
+# Paste the full PEM (unencrypted PKCS#8) using a YAML block scalar: |
+snowflake_private_key_dev: ""
+snowflake_private_key_qa: ""
+snowflake_private_key_prod: ""

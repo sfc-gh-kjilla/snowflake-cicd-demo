@@ -1,0 +1,4 @@
+ci/vars.yml
+*.p8
+*.pem
+keys/

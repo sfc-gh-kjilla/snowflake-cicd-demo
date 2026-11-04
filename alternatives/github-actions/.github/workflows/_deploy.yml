@@ -1,0 +1,47 @@
+name: Deploy to environment (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment name (dev, qa, prod). Must match the OIDC subject.
+        required: true
+        type: string
+      target_schema:
+        description: Schema to deploy into
+        required: false
+        type: string
+        default: APP
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # The environment determines the OIDC subject, the approval gate and the
+    # environment-scoped variables (SNOWFLAKE_ACCOUNT, TARGET_DB).
+    environment: ${{ inputs.environment }}
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+      TARGET_DB: ${{ vars.TARGET_DB }}
+      TARGET_SCHEMA: ${{ inputs.target_schema }}
+      DEPLOY_ENV: ${{ inputs.environment }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Snowflake CLI (OIDC)
+        uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+
+      - name: Verify connection
+        run: snow connection test -x
+
+      - name: Migrate, test and record
+        run: bash scripts/deploy.sh
