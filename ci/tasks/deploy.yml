@@ -8,6 +8,8 @@ image_resource:
 
 inputs:
   - name: repo
+  - name: release     # github-release; absent in DEV jobs
+    optional: true
 
 params:
   AUTH_MODE: oidc            # oidc | keypair

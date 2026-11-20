@@ -1,11 +1,11 @@
 -- Schema and tables managed by DCM. DCM computes CREATE/ALTER/DROP from these
 -- desired-state definitions; removing a DEFINE drops the object on deploy.
 
-DEFINE SCHEMA {{db}}.APP_DCM
+DEFINE SCHEMA {{db}}.APP_DCM{{suffix}}
     COMMENT = 'Managed by DCM project {{db}}.DCM.DEMO_PROJECT'
     DATA_RETENTION_TIME_IN_DAYS = {{retention_days}};
 
-DEFINE TABLE {{db}}.APP_DCM.ORDERS (
+DEFINE TABLE {{db}}.APP_DCM{{suffix}}.ORDERS (
     ORDER_ID NUMBER,
     CUSTOMER_ID NUMBER,
     ORDER_DATE DATE,
@@ -14,7 +14,7 @@ DEFINE TABLE {{db}}.APP_DCM.ORDERS (
 )
 COMMENT = 'Demo orders';
 
-DEFINE TABLE {{db}}.APP_DCM.DEPLOYMENT_LOG (
+DEFINE TABLE {{db}}.APP_DCM{{suffix}}.DEPLOYMENT_LOG (
     DEPLOYED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
     ENVIRONMENT VARCHAR,
     GIT_SHA VARCHAR,

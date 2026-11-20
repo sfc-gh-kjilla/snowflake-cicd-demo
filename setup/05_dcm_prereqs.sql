@@ -14,3 +14,5 @@ GRANT USAGE ON SCHEMA CICD_DEMO_<% ENV %>.DCM TO ROLE CICD_DEPLOY_<% ENV %>;
 GRANT CREATE DCM PROJECT ON SCHEMA CICD_DEMO_<% ENV %>.DCM TO ROLE CICD_DEPLOY_<% ENV %>;
 -- Snowflake CLI uploads project files to a temporary stage during plan/deploy
 GRANT CREATE STAGE ON SCHEMA CICD_DEMO_<% ENV %>.DCM TO ROLE CICD_DEPLOY_<% ENV %>;
+-- Governance definitions (governance.sql) create database roles
+GRANT CREATE DATABASE ROLE ON DATABASE CICD_DEMO_<% ENV %> TO ROLE CICD_DEPLOY_<% ENV %>;

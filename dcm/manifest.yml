@@ -11,11 +11,11 @@ targets:
     project_name: 'CICD_DEMO_DEV.DCM.DEMO_PROJECT'
     project_owner: CICD_DEPLOY_DEV
     templating_config: 'DEV'
-  QA:
+  UAT:
     account_identifier: SFSENORTHAMERICA-KJILLA
-    project_name: 'CICD_DEMO_QA.DCM.DEMO_PROJECT'
-    project_owner: CICD_DEPLOY_QA
-    templating_config: 'QA'
+    project_name: 'CICD_DEMO_UAT.DCM.DEMO_PROJECT'
+    project_owner: CICD_DEPLOY_UAT
+    templating_config: 'UAT'
   PROD:
     account_identifier: SFSENORTHAMERICA-KJILLA
     project_name: 'CICD_DEMO_PROD.DCM.DEMO_PROJECT'
@@ -26,12 +26,16 @@ templating:
   defaults:
     db: 'CICD_DEMO_DEV'
     retention_days: 1
+    # Empty for shared environments. A developer sandbox overrides it at run
+    # time (scripts/dev-sandbox.sh -> --variable "suffix='_KIRAN'") so its
+    # objects get distinct names and never collide with DEV.
+    suffix: ''
   configurations:
     DEV:
       db: 'CICD_DEMO_DEV'
       retention_days: 1
-    QA:
-      db: 'CICD_DEMO_QA'
+    UAT:
+      db: 'CICD_DEMO_UAT'
       retention_days: 1
     PROD:
       db: 'CICD_DEMO_PROD'

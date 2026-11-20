@@ -1,12 +1,16 @@
-# Snowflake CI/CD on Concourse: DEV -> QA -> PROD
+# Snowflake CI/CD on Concourse: DEV -> release vX.Y.Z -> UAT -> PROD
 #
 #   fly -t local set-pipeline -p snowflake-cicd \
 #     -c ci/pipeline.yml -l ci/vars.yml
 #
-# Gates: deploy-dev triggers on every commit to main. deploy-qa and deploy-prod
-# only accept a commit that passed the previous job (`passed:`) and only run
-# when a human triggers them (`trigger: false`). Restrict who can trigger with
-# Concourse team roles; a separate team for prod is stronger still.
+# Flow (mirrors a release-based promotion model):
+#   1. Commit to main          -> deploy-dev / dcm-dev run automatically
+#   2. DEV passes              -> create-release tags vX.Y.Z, publishes a GitHub Release
+#   3. New release             -> deploy-uat / dcm-deploy-uat run automatically
+#   4. UAT sign-off            -> deploy-prod / dcm-deploy-prod triggered manually
+#                                 with the same release (passed: ...-uat)
+# Restrict who can trigger PROD with Concourse team roles; a separate team for
+# prod is stronger still.
 
 var_sources:
   # Concourse 7.14+ signs a short-lived JWT per step. With subject_scope: job
@@ -26,20 +30,32 @@ resources:
     source:
       uri: ((git_uri))
       branch: main
+      fetch_tags: true   # create-release reads the latest vX.Y.Z tag
+
+  # Immutable release: git tag + GitHub Release, created by create-release.
+  - name: release
+    type: github-release
+    icon: tag
+    source:
+      owner: ((github_owner))
+      repository: ((github_repo))
+      access_token: ((github_access_token))
 
 # Two ways to deploy the same app, shown as tabs in the Concourse UI:
 #   scripts - versioned SQL migrations via `snow sql`
 #   dcm     - declarative DCM project via `snow dcm plan` / `deploy`
 # They manage different schemas (APP vs APP_DCM), so they never overlap.
+# create-release appears on both tabs: one release feeds both paths.
 groups:
   - name: scripts
-    jobs: [deploy-dev, deploy-qa, deploy-prod]
+    jobs: [deploy-dev, create-release, deploy-uat, deploy-prod]
   - name: dcm
-    jobs: [dcm-dev, dcm-plan-qa, dcm-deploy-qa, dcm-plan-prod, dcm-deploy-prod]
+    jobs: [dcm-dev, create-release, dcm-deploy-uat, dcm-plan-prod, dcm-deploy-prod]
   - name: setup
     jobs: [print-token-claims]
 
 jobs:
+  # ---- DEV: every commit ----------------------------------------------------
   - name: deploy-dev
     serial: true
     plan:
@@ -57,41 +73,6 @@ jobs:
           SNOWFLAKE_USER: SVC_CICD_DEV_KP
           SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_dev))
 
-  - name: deploy-qa
-    serial: true
-    plan:
-      - get: repo
-        passed: [deploy-dev]
-        trigger: false   # manual approval: click "+" / fly trigger-job
-      - task: deploy
-        file: repo/ci/tasks/deploy.yml
-        params:
-          <<: *common
-          DEPLOY_ENV: qa
-          TARGET_DB: CICD_DEMO_QA
-          SNOWFLAKE_USER: SVC_CICD_QA_KP
-          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_qa))
-
-  - name: deploy-prod
-    serial: true
-    plan:
-      - get: repo
-        passed: [deploy-qa]
-        trigger: false   # manual approval by a prod-team operator
-      - task: deploy
-        file: repo/ci/tasks/deploy.yml
-        params:
-          <<: *common
-          DEPLOY_ENV: prod
-          TARGET_DB: CICD_DEMO_PROD
-          SNOWFLAKE_USER: SVC_CICD_PROD_KP
-          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_prod))
-
-  # ---- DCM path -------------------------------------------------------------
-  # dcm-dev: plan + deploy automatically on every commit.
-  # QA/PROD: a manual plan job (approver reads the planned CREATE/ALTER/DROP in
-  # the build log), then a manual deploy job that only accepts a commit whose
-  # plan job passed. Deploy re-plans internally against the live state.
   - name: dcm-dev
     serial: true
     plan:
@@ -110,47 +91,95 @@ jobs:
           SNOWFLAKE_USER: SVC_CICD_DEV_KP
           SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_dev))
 
-  - name: dcm-plan-qa
+  # ---- Release: tag the commit that passed DEV ------------------------------
+  - name: create-release
     serial: true
     plan:
       - get: repo
-        passed: [dcm-dev]
-        trigger: false
-      - task: dcm
-        file: repo/ci/tasks/dcm.yml
-        params: &dcm_qa
-          <<: *dcm_common
-          DCM_ACTION: plan
-          DCM_TARGET: QA
-          DEPLOY_ENV: qa
-          TARGET_DB: CICD_DEMO_QA
-          SNOWFLAKE_USER: SVC_CICD_QA_KP
-          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_qa))
+        trigger: true
+        passed: [deploy-dev, dcm-dev]
+      - task: next-version
+        file: repo/ci/tasks/create-release.yml
+      - put: release
+        params:
+          name: release/name
+          tag: release/tag
+          body: release/body
+          commitish: release/commitish
 
-  - name: dcm-deploy-qa
+  # ---- UAT: automatic on a new release --------------------------------------
+  - name: deploy-uat
     serial: true
     plan:
+      - get: release
+        trigger: true
+        passed: [create-release]
       - get: repo
-        passed: [dcm-plan-qa]
-        trigger: false   # approve after reviewing dcm-plan-qa output
+        passed: [create-release]
+      - task: deploy
+        file: repo/ci/tasks/deploy.yml
+        params:
+          <<: *common
+          DEPLOY_ENV: uat
+          TARGET_DB: CICD_DEMO_UAT
+          SNOWFLAKE_USER: SVC_CICD_UAT_KP
+          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_uat))
+
+  - name: dcm-deploy-uat
+    serial: true
+    plan:
+      - get: release
+        trigger: true
+        passed: [create-release]
+      - get: repo
+        passed: [create-release]
       - task: dcm
         file: repo/ci/tasks/dcm.yml
         params:
-          <<: *dcm_qa
-          DCM_ACTION: deploy
+          <<: *dcm_common
+          DCM_TARGET: UAT
+          BLOCK_DROPS: "true"
+          DEPLOY_ENV: uat
+          TARGET_DB: CICD_DEMO_UAT
+          SNOWFLAKE_USER: SVC_CICD_UAT_KP
+          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_uat))
 
+  # ---- PROD: manual, same release that passed UAT ---------------------------
+  - name: deploy-prod
+    serial: true
+    plan:
+      - get: release
+        passed: [deploy-uat]
+        trigger: false   # manual after UAT / business sign-off
+      - get: repo
+        passed: [deploy-uat]
+      - task: deploy
+        file: repo/ci/tasks/deploy.yml
+        params:
+          <<: *common
+          DEPLOY_ENV: prod
+          TARGET_DB: CICD_DEMO_PROD
+          SNOWFLAKE_USER: SVC_CICD_PROD_KP
+          SNOWFLAKE_PRIVATE_KEY_RAW: ((snowflake_private_key_prod))
+
+  # DCM PROD: a manual plan job (approver reads the planned CREATE/ALTER/DROP
+  # in the build log), then a manual deploy that only accepts a release whose
+  # plan passed. Deploy re-plans internally against the live state.
   - name: dcm-plan-prod
     serial: true
     plan:
-      - get: repo
-        passed: [dcm-deploy-qa]
+      - get: release
+        passed: [dcm-deploy-uat]
         trigger: false
+      - get: repo
+        passed: [dcm-deploy-uat]
       - task: dcm
         file: repo/ci/tasks/dcm.yml
         params: &dcm_prod
           <<: *dcm_common
           DCM_ACTION: plan
           DCM_TARGET: PROD
+          BLOCK_DROPS: "true"
           DEPLOY_ENV: prod
           TARGET_DB: CICD_DEMO_PROD
           SNOWFLAKE_USER: SVC_CICD_PROD_KP
@@ -159,14 +188,17 @@ jobs:
   - name: dcm-deploy-prod
     serial: true
     plan:
-      - get: repo
+      - get: release
         passed: [dcm-plan-prod]
         trigger: false   # approve after reviewing dcm-plan-prod output
+      - get: repo
+        passed: [dcm-plan-prod]
       - task: dcm
         file: repo/ci/tasks/dcm.yml
         params:
           <<: *dcm_prod
           DCM_ACTION: deploy
+
   # Setup helper: prints the decoded header and claims (not the signed token)
   # so you can copy iss/sub/aud into setup/02_oidc_service_user.sql. Its own
   # sub ends in /print-token-claims; deploy jobs end in /deploy-<env>.

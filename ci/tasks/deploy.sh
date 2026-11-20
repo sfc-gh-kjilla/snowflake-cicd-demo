@@ -24,9 +24,11 @@ case "${AUTH_MODE}" in
     ;;
 esac
 
+# Release tag (UAT/PROD) or branch (DEV), recorded in DEPLOYMENT_LOG.
+export GIT_REF="$(cat release/tag 2>/dev/null || echo main)"
+
 cd repo
 export GIT_SHA="$(cat .git/ref 2>/dev/null || git rev-parse HEAD)"
-export GIT_REF=main
 export RUN_URL="concourse:${DEPLOY_ENV}"
 
 snow connection test -x

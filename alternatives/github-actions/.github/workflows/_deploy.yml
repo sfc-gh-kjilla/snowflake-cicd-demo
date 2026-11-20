@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: GitHub environment name (dev, qa, prod). Must match the OIDC subject.
+        description: GitHub environment name (dev, uat, prod). Must match the OIDC subject.
         required: true
         type: string
       target_schema:

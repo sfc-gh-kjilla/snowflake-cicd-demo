@@ -1,5 +1,5 @@
 -- Each check raises an error on failure, so `snow sql` exits non-zero and the
--- GitHub job fails, blocking promotion to the next environment.
+-- CI job fails, blocking promotion to the next environment.
 EXECUTE IMMEDIATE $$
 DECLARE
   n INTEGER;

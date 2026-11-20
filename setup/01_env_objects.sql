@@ -1,7 +1,7 @@
 -- Step 1 of 2 per environment: warehouse, database, schema, deploy role.
 -- Run once per environment as ACCOUNTADMIN. In production each environment is
 -- its own Snowflake account; in the single-account demo the databases
--- CICD_DEMO_DEV / _QA / _PROD stand in for the three accounts.
+-- CICD_DEMO_DEV / _UAT / _PROD stand in for the three accounts.
 --
 --   snow sql -f setup/01_env_objects.sql -D "env=dev" -D "ENV=DEV"
 

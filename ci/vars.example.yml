@@ -2,6 +2,12 @@
 git_uri: https://github.com/<owner>/snowflake-cicd-demo.git
 snowflake_account: SFSENORTHAMERICA-KJILLA
 
+# github-release resource (create-release job). Fine-grained PAT on this repo
+# with Contents: Read and write.
+github_owner: <owner>
+github_repo: snowflake-cicd-demo
+github_access_token: ""
+
 # oidc (primary) or keypair (fallback when the issuer isn't publicly reachable)
 auth_mode: oidc
 
@@ -11,5 +17,5 @@ snowflake_oidc_audience: sfsenorthamerica-kjilla.snowflakecomputing.com
 # Key-pair fallback only; leave "" when auth_mode is oidc.
 # Paste the full PEM (unencrypted PKCS#8) using a YAML block scalar: |
 snowflake_private_key_dev: ""
-snowflake_private_key_qa: ""
+snowflake_private_key_uat: ""
 snowflake_private_key_prod: ""

@@ -1,4 +1,4 @@
-name: Promote DEV -> QA -> PROD
+name: Promote DEV -> UAT -> PROD
 
 on:
   push:
@@ -21,14 +21,14 @@ jobs:
     with:
       environment: dev
 
-  qa:
+  uat:
     needs: dev
     uses: ./.github/workflows/_deploy.yml
     with:
-      environment: qa   # protection rule: required reviewer
+      environment: uat   # protection rule: required reviewer
 
   prod:
-    needs: qa
+    needs: uat
     uses: ./.github/workflows/_deploy.yml
     with:
       environment: prod # protection rule: required reviewers, main branch only

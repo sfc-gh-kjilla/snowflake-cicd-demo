@@ -8,10 +8,12 @@ image_resource:
 
 inputs:
   - name: repo
+  - name: release     # github-release; absent in DEV jobs
+    optional: true
 
 params:
   DCM_ACTION: plan           # plan | deploy
-  DCM_TARGET:                # DEV | QA | PROD (manifest target)
+  DCM_TARGET:                # DEV | UAT | PROD (manifest target)
   AUTH_MODE: oidc            # oidc | keypair
   SNOWFLAKE_ACCOUNT:
   SNOWFLAKE_TOKEN:
@@ -19,6 +21,8 @@ params:
   SNOWFLAKE_PRIVATE_KEY_RAW:
   TARGET_DB:
   DEPLOY_ENV:
+  BLOCK_DROPS: "false"       # true in UAT/PROD: fail on DROP of db/schema/table/stage
+  ALLOW_DROPS: "false"       # set true on a re-run to accept a reviewed drop
 
 run:
   path: bash
